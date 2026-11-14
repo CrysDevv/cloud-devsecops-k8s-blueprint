@@ -1,0 +1,24 @@
+# Overlay para un clúster local (kind/minikube) con LocalStack desplegado dentro del
+# clúster en el namespace "localstack" (Service "localstack", puerto 4566).
+# Uso: helm upgrade --install demo . -f values-localstack.yaml --set image.repository=<repo>
+env:
+  - name: AWS_ENDPOINT_URL
+    value: http://localstack.localstack.svc.cluster.local:4566
+  - name: AWS_REGION
+    value: us-east-1
+  # Credenciales ficticias exclusivas para LocalStack.
+  - name: AWS_ACCESS_KEY_ID
+    value: test
+  - name: AWS_SECRET_ACCESS_KEY
+    value: test
+
+networkPolicy:
+  egress:
+    extra:
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: localstack
+        ports:
+          - port: 4566
+            protocol: TCP

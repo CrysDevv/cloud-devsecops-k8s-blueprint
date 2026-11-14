@@ -1,0 +1,19 @@
+{{ include "microservice-base.fullname" . }} desplegado en el namespace {{ .Release.Namespace }}.
+
+Imagen:       {{ include "microservice-base.image" . }}
+Puerto:       {{ .Values.containerPort }} (Service: {{ .Values.service.port }})
+Seguridad:    UID {{ .Values.securityContext.runAsUser }}, rootfs de solo lectura, /tmp en memoria, capabilities eliminadas
+{{- if .Values.networkPolicy.enabled }}
+Red:          NetworkPolicy restrictiva activa (deny-by-default). Declara en networkPolicy.egress lo que el servicio necesite alcanzar.
+{{- end }}
+
+Estado del despliegue:
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "microservice-base.fullname" . }}
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+{{- if .Values.ingress.enabled }}
+
+Ingress:
+{{- range .Values.ingress.hosts }}
+  https://{{ .host }}
+{{- end }}
+{{- end }}

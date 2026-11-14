@@ -1,0 +1,23 @@
+# Uso: terraform apply -var-file=environments/localstack.tfvars.example
+# Requiere el stack local de la Fase 1 (docker compose up -d).
+use_localstack      = true
+localstack_endpoint = "http://localhost:4566"
+aws_region          = "us-east-1"
+
+project      = "blueprint"
+environment  = "dev"
+service_name = "orders"
+
+# LocalStack: sin KMS para SNS y sin RedriveAllowPolicy (soporte parcial según versión).
+sns_kms_master_key_id = null
+restrict_dlq_sources  = false
+
+# Entorno efímero: permite destruir sin fricción.
+s3_force_destroy               = true
+secret_recovery_window_in_days = 0
+
+# Valor ficticio exclusivo para LocalStack.
+create_initial_secret_version = true
+initial_secret_values = {
+  api_key = "localstack-dev-only"
+}

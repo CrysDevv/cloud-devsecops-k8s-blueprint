@@ -1,0 +1,92 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "microservice-base.fullname" . }}
+  labels:
+    {{- include "microservice-base.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "microservice-base.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    {{- range .Values.networkPolicy.ingress.fromNamespaces }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace | quote }}
+          {{- with .podLabels }}
+          podSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+          {{- end }}
+      ports:
+        - port: http
+          protocol: TCP
+    {{- end }}
+    {{- with .Values.networkPolicy.ingress.fromPods }}
+    - from:
+        {{- range . }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+        {{- end }}
+      ports:
+        - port: http
+          protocol: TCP
+    {{- end }}
+  egress:
+    {{- if .Values.networkPolicy.egress.dns.enabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.egress.dns.namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.egress.dns.podLabels | nindent 14 }}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    {{- end }}
+    {{- with .Values.networkPolicy.egress.otelCollector }}
+    {{- if .enabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .podLabels | nindent 14 }}
+      ports:
+        {{- range .ports }}
+        - port: {{ . }}
+          protocol: TCP
+        {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- range .Values.networkPolicy.egress.cidrs }}
+    {{- if not .ports }}
+    {{- fail "networkPolicy.egress.cidrs[*].ports es obligatorio (egress restrictivo)" }}
+    {{- end }}
+    - to:
+        - ipBlock:
+            cidr: {{ .cidr }}
+            {{- with .except }}
+            except:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+      ports:
+        {{- range .ports }}
+        - port: {{ . }}
+          protocol: TCP
+        {{- end }}
+    {{- end }}
+    {{- with .Values.networkPolicy.egress.extra }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
