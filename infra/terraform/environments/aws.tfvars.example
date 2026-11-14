@@ -1,0 +1,17 @@
+# Uso: terraform apply -var-file=environments/aws.tfvars.example
+# Credenciales: perfil/SSO/rol estándar de AWS (no se versionan en el repositorio).
+use_localstack = false
+aws_region     = "us-east-1"
+
+project      = "blueprint"
+environment  = "prod"
+service_name = "orders"
+
+# Unicidad global del bucket: usa el ID de cuenta de 12 dígitos como sufijo.
+# bucket_name_suffix = "123456789012"
+
+sns_kms_master_key_id = "alias/aws/sns"
+restrict_dlq_sources  = true
+
+s3_force_destroy               = false
+secret_recovery_window_in_days = 30
