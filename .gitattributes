@@ -1,5 +1,3 @@
-@"
 *.tf linguist-detectable=true
 *.tfvars.example linguist-detectable=true
 Dockerfile.* linguist-detectable=true
-"@ | Set-Content -Path .gitattributes -Encoding UTF8
