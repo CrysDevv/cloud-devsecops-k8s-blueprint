@@ -1,0 +1,68 @@
+# syntax=docker/dockerfile:1.7
+# NestJS (Node.js 20) - multi-stage endurecido.
+# Contexto de build: raíz del microservicio (package.json, package-lock.json, src/).
+# Requiere: "npm run build" que genere dist/main.js y package-lock.json versionado.
+# Uso: scripts/build-image.sh node20 <ruta-del-servicio> <imagen:tag>
+
+ARG NODE_IMAGE=node:20.18.1-alpine3.20
+
+# ---------- Etapa 1: dependencias completas (build) ----------
+FROM ${NODE_IMAGE} AS deps
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts --no-audit --no-fund
+
+# ---------- Etapa 2: compilación ----------
+FROM deps AS build
+COPY . .
+RUN npm run build
+
+# ---------- Etapa 3: solo dependencias de producción ----------
+FROM ${NODE_IMAGE} AS prod-deps
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
+# ---------- Etapa 4: runtime ----------
+FROM ${NODE_IMAGE} AS runtime
+
+ARG APP_VERSION=0.0.0
+ARG VCS_REF=unknown
+ARG APP_PORT=8080
+
+LABEL org.opencontainers.image.title="node20-service" \
+      org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.description="NestJS service on Node.js 20 (hardened)"
+
+ENV NODE_ENV=production \
+    APP_PORT=${APP_PORT} \
+    PORT=${APP_PORT} \
+    HEALTH_PATH=/health \
+    npm_config_cache=/tmp/.npm
+
+# Sin gestores de paquetes en runtime: reduce superficie de ataque.
+RUN apk upgrade --no-cache \
+ && apk add --no-cache tini \
+ && addgroup -g 10001 -S app \
+ && adduser -S -D -H -u 10001 -G app -s /sbin/nologin app \
+ && rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+           /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-v*
+
+WORKDIR /app
+COPY --from=prod-deps --chown=10001:10001 /build/node_modules ./node_modules
+COPY --from=build --chown=10001:10001 /build/dist ./dist
+COPY --chown=10001:10001 package.json ./
+
+USER 10001:10001
+EXPOSE ${APP_PORT}
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["node", "-e", "fetch('http://127.0.0.1:'+process.env.APP_PORT+process.env.HEALTH_PATH,{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "dist/main.js"]
