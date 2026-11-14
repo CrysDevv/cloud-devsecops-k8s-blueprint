@@ -74,6 +74,7 @@ services:
       - --web.listen-address=:9090
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m

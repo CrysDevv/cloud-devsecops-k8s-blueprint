@@ -1,0 +1,39 @@
+groups:
+  - name: blueprint-microservice-slo
+    interval: 15s
+    rules:
+      - alert: HighHttp5xxErrorRate
+        expr: |
+          (
+            sum by (service_name) (rate(blueprint_calls_total{http_status_code=~"5.."}[5m]))
+            /
+            clamp_min(sum by (service_name) (rate(blueprint_calls_total[5m])), 0.001)
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tasa de errores HTTP 5xx > 5% en {{ $labels.service_name }}"
+          description: "El servicio {{ $labels.service_name }} supera el 5% de respuestas 5xx durante los últimos 2 minutos."
+
+      - alert: HighLatencyP99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum by (service_name, le) (rate(blueprint_duration_milliseconds_bucket[5m]))
+          ) > 1000
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latencia p99 > 1000ms en {{ $labels.service_name }}"
+          description: "El percentil 99 de latencia en {{ $labels.service_name }} superó 1 segundo durante 3 minutos."
+
+      - alert: CollectorDown
+        expr: up{job="otel-collector-apps"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OpenTelemetry Collector no responde al scrape de Prometheus"
+          description: "Prometheus no puede recolectar métricas desde otel-collector:8889."

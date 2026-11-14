@@ -1,9 +1,12 @@
-# Configuración base de Prometheus (la Fase 3 la amplía).
+# Configuración completa de Prometheus (Fase 3).
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
     environment: local
+
+rule_files:
+  - /etc/prometheus/alerts.yml
 
 scrape_configs:
   - job_name: prometheus
@@ -14,3 +17,8 @@ scrape_configs:
     honor_labels: true
     static_configs:
       - targets: ["otel-collector:8889"]
+
+  - job_name: app-direct-metrics
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["app:8080"]

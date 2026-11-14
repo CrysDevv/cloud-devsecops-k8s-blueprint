@@ -1,5 +1,8 @@
-# Configuración base del OpenTelemetry Collector (la Fase 3 la amplía).
-# Métricas OTLP -> exporter Prometheus (:8889). Trazas y logs -> salida de depuración.
+# Configuración completa del OpenTelemetry Collector (Fase 3).
+# - Recibe métricas, trazas y logs por OTLP (gRPC :4317 / HTTP :4318).
+# - Conector spanmetrics: deriva histogramas de latencia (p50/p95/p99) y conteo
+#   de llamadas/errores HTTP a partir de las trazas distribuidas.
+# - Exporta métricas combinadas hacia Prometheus (:8889).
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
@@ -20,10 +23,33 @@ processors:
   batch:
     timeout: 5s
     send_batch_size: 512
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: local
+        action: upsert
+
+connectors:
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s]
+    dimensions:
+      - name: http.method
+        default: GET
+      - name: http.route
+        default: /unknown
+      - name: http.status_code
+    exemplars:
+      enabled: true
+    metrics_flush_interval: 15s
 
 exporters:
   prometheus:
     endpoint: 0.0.0.0:8889
+    namespace: blueprint
+    send_timestamps: true
+    metric_expiration: 5m
     resource_to_telemetry_conversion:
       enabled: true
   debug:
@@ -32,15 +58,15 @@ exporters:
 service:
   extensions: [health_check]
   pipelines:
-    metrics:
-      receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [prometheus]
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [debug]
+      processors: [memory_limiter, resource, batch]
+      exporters: [spanmetrics, debug]
+    metrics:
+      receivers: [otlp, spanmetrics]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheus]
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, resource, batch]
       exporters: [debug]

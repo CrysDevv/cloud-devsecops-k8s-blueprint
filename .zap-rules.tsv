@@ -1,0 +1,14 @@
+# Reglas de OWASP ZAP Baseline Scan
+# Formato: <rule-id>\t<IGNORE|INFO|WARN|FAIL>\t<comentario>
+10010	WARN	Cookie sin flag HttpOnly (evaluar si la API usa cookies)
+10011	WARN	Cookie sin flag Secure (en local HTTP se permite, en prod TLS es obligatorio en Ingress)
+10021	FAIL	Falta cabecera X-Content-Type-Options: nosniff
+10035	FAIL	Falta cabecera Strict-Transport-Security (HSTS)
+10038	WARN	Content-Security-Policy no definida (ajustar si el servicio solo expone JSON REST)
+10096	IGNORE	Timestamp disclosure en respuestas JSON estándar de API
+10202	FAIL	Ausencia de tokens Anti-CSRF en formularios
+40012	FAIL	Cross Site Scripting (Reflected)
+40014	FAIL	Cross Site Scripting (Persistent)
+40018	FAIL	SQL Injection
+90019	FAIL	Server Side Code Injection
+90020	FAIL	Remote OS Command Injection
