@@ -1,0 +1,136 @@
+{
+  "uid": "microservice-red-use",
+  "title": "Microservice RED & Saturation (p50/p95/p99, 5xx, CPU/RAM)",
+  "tags": ["blueprint", "red", "use", "sre"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(blueprint_calls_total, service_name)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Latencia HTTP (p50 / p95 / p99)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 9 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "min": 0 },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(blueprint_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(blueprint_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(blueprint_duration_milliseconds_bucket{service_name=~\"$service\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Tasa de Errores HTTP 5xx (%)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum(rate(blueprint_calls_total{service_name=~\"$service\", http_status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(blueprint_calls_total{service_name=~\"$service\"}[5m])), 0.001))",
+          "legendFormat": "5xx Error Rate %"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(blueprint_calls_total{service_name=~\"$service\"}[5m]))",
+          "legendFormat": "Requests / seg"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Saturación de CPU (Cores / Runtime Process)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0 },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_name) (rate(process_cpu_seconds_total[2m]))",
+          "legendFormat": "CPU Process ({{service_name}})"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{container=\"app\"}[2m]))",
+          "legendFormat": "CPU Container ({{pod}})"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Saturación de Memoria RAM (RSS / Working Set)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "min": 0 },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_name) (process_resident_memory_bytes)",
+          "legendFormat": "RAM RSS ({{service_name}})"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (pod) (container_memory_working_set_bytes{container=\"app\"})",
+          "legendFormat": "RAM Working Set ({{pod}})"
+        }
+      ]
+    }
+  ]
+}
