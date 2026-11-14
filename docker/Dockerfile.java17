@@ -1,0 +1,56 @@
+# syntax=docker/dockerfile:1.7
+# Spring Boot (Java 17) - multi-stage endurecido.
+# Contexto de build: raíz del microservicio (con pom.xml y src/).
+# Uso: scripts/build-image.sh java17 <ruta-del-servicio> <imagen:tag>
+
+ARG MAVEN_IMAGE=maven:3.9.9-eclipse-temurin-17
+ARG JRE_IMAGE=eclipse-temurin:17-jre-alpine
+
+# ---------- Etapa 1: build ----------
+FROM ${MAVEN_IMAGE} AS build
+WORKDIR /build
+
+COPY pom.xml ./
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -ntp -q dependency:go-offline
+
+COPY src ./src
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -ntp -DskipTests package \
+ && mkdir -p /out \
+ && cp "$(find target -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' ! -name '*.original' | head -n 1)" /out/app.jar
+
+# ---------- Etapa 2: runtime ----------
+FROM ${JRE_IMAGE} AS runtime
+
+ARG APP_VERSION=0.0.0
+ARG VCS_REF=unknown
+ARG APP_PORT=8080
+
+LABEL org.opencontainers.image.title="java17-service" \
+      org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.description="Spring Boot service on Java 17 (hardened)"
+
+ENV APP_PORT=${APP_PORT} \
+    SERVER_PORT=${APP_PORT} \
+    HEALTH_PATH=/actuator/health \
+    JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -Djava.io.tmpdir=/tmp -Djava.security.egd=file:/dev/./urandom"
+
+RUN apk upgrade --no-cache \
+ && apk add --no-cache tini \
+ && addgroup -g 10001 -S app \
+ && adduser -S -D -H -u 10001 -G app -s /sbin/nologin app \
+ && mkdir -p /app \
+ && chown 10001:10001 /app
+
+WORKDIR /app
+COPY --from=build --chown=10001:10001 /out/app.jar /app/app.jar
+
+USER 10001:10001
+EXPOSE ${APP_PORT}
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+    CMD wget -q -T 3 -O /dev/null "http://127.0.0.1:${APP_PORT}${HEALTH_PATH}" || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--", "java", "-jar", "/app/app.jar"]

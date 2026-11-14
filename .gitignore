@@ -1,0 +1,31 @@
+# Secretos y entorno local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDEs y SO
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Artefactos de build de los servicios
+target/
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+
+# Terraform (Fase 2)
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+!*.tfvars.example
+
+# Logs
+*.log

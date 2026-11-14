@@ -1,0 +1,39 @@
+# Override para ejecutar UN microservicio con la configuración endurecida de runtime.
+# Uso:
+#   APP_IMAGE=mi-servicio:dev docker compose -f docker-compose.yml -f docker-compose.app.yml up -d
+services:
+  app:
+    image: "${APP_IMAGE:?Define APP_IMAGE (por ejemplo: mi-servicio:dev)}"
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=128m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 768m
+    cpus: 1.0
+    environment:
+      APP_PORT: "${APP_PORT:-8080}"
+      SERVER_PORT: "${APP_PORT:-8080}"
+      PORT: "${APP_PORT:-8080}"
+      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-app}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+      AWS_ENDPOINT_URL: "http://localstack:4566"
+      AWS_REGION: "us-east-1"
+      # Credenciales ficticias exclusivas para LocalStack (no son reales).
+      AWS_ACCESS_KEY_ID: "test"
+      AWS_SECRET_ACCESS_KEY: "test"
+    ports:
+      - "127.0.0.1:${APP_HOST_PORT:-8080}:${APP_PORT:-8080}"
+    depends_on:
+      localstack:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      - platform
