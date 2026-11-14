@@ -1,0 +1,11 @@
+apiVersion: v2
+name: microservice-base
+description: Chart base endurecido (Zero-Trust) para microservicios Java 17, Node.js 20 y Python 3.12
+type: application
+version: 0.2.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.27.0-0"
+keywords:
+  - microservice
+  - hardened
+  - zero-trust
